@@ -1,14 +1,11 @@
 pub mod common;
 pub mod macros;
 
-use std::error::Error as StdError;
-use std::fmt;
-
 pub trait GenericServerErrorTrait:
-    StdError + fmt::Debug + fmt::Display + Send + Sync + 'static
+    std::error::Error + std::fmt::Debug + std::fmt::Display + Send + Sync + 'static
 {
     fn should_be_shown_to_client(&self) -> bool;
-    fn into_std_error(self: Box<Self>) -> Box<dyn StdError + Send + Sync>;
+    fn into_std_error(self: Box<Self>) -> Box<dyn std::error::Error + Send + Sync>;
 }
 
 pub type GenericServerError = Box<dyn GenericServerErrorTrait>;
@@ -23,20 +20,20 @@ mod tests {
     #[derive(Debug)]
     struct TestErrorType(&'static str);
 
-    impl fmt::Display for TestErrorType {
-        fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    impl std::fmt::Display for TestErrorType {
+        fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
             let TestErrorType(text) = self;
             write!(f, "Example error message with child text: {}.", text)
         }
     }
 
-    impl StdError for TestErrorType {}
+    impl std::error::Error for TestErrorType {}
 
     impl GenericServerErrorTrait for TestErrorType {
         fn should_be_shown_to_client(&self) -> bool {
             true
         }
-        fn into_std_error(self: Box<Self>) -> Box<dyn StdError + Send + Sync> {
+        fn into_std_error(self: Box<Self>) -> Box<dyn std::error::Error + Send + Sync> {
             self
         }
     }

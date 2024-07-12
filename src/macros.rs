@@ -36,8 +36,8 @@ macro_rules! define_user_visible_error_type {
             }
         }
 
-        impl fmt::Display for $name {
-            fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        impl std::fmt::Display for $name {
+            fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
                 write!(f, $msg)
             }
         }
@@ -46,12 +46,12 @@ macro_rules! define_user_visible_error_type {
             fn should_be_shown_to_client(&self) -> bool {
                 true
             }
-            fn into_std_error(self: Box<Self>) -> Box<dyn StdError + Send + Sync> {
+            fn into_std_error(self: Box<Self>) -> Box<dyn std::error::Error + Send + Sync> {
                 self
             }
         }
 
-        impl StdError for $name {}
+        impl std::error::Error for $name {}
 
         impl From<$name> for GenericServerError {
             fn from(error: $name) -> Self {
@@ -108,8 +108,8 @@ macro_rules! define_user_visible_error_type_with_visible_info {
             }
         }
 
-        impl fmt::Display for $name {
-            fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        impl std::fmt::Display for $name {
+            fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
                 write!(f, $msg, user_visible_info = self.user_visible_info)
             }
         }
@@ -118,12 +118,12 @@ macro_rules! define_user_visible_error_type_with_visible_info {
             fn should_be_shown_to_client(&self) -> bool {
                 true
             }
-            fn into_std_error(self: Box<Self>) -> Box<dyn StdError + Send + Sync> {
+            fn into_std_error(self: Box<Self>) -> Box<dyn std::error::Error + Send + Sync> {
                 self
             }
         }
 
-        impl StdError for $name {}
+        impl std::error::Error for $name {}
 
         impl From<$name> for GenericServerError {
             fn from(error: $name) -> Self {
@@ -171,8 +171,8 @@ macro_rules! define_internal_error_type {
             }
         }
 
-        impl fmt::Display for $name {
-            fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        impl std::fmt::Display for $name {
+            fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
                 write!(f, $msg)?;
                 write!(f, " | {:?}", self)
             }
@@ -182,12 +182,12 @@ macro_rules! define_internal_error_type {
             fn should_be_shown_to_client(&self) -> bool {
                 false
             }
-            fn into_std_error(self: Box<Self>) -> Box<dyn StdError + Send + Sync> {
+            fn into_std_error(self: Box<Self>) -> Box<dyn std::error::Error + Send + Sync> {
                 self
             }
         }
 
-        impl StdError for $name {}
+        impl std::error::Error for $name {}
 
         impl From<$name> for GenericServerError {
             fn from(error: $name) -> Self {
@@ -204,8 +204,6 @@ macro_rules! define_internal_error_type {
 mod tests {
     use crate::GenericServerError;
     use crate::GenericServerErrorTrait;
-    use std::error::Error as StdError;
-    use std::fmt;
 
     define_user_visible_error_type!(UserVisibleError, "User-visible error.");
     define_user_visible_error_type_with_visible_info!(

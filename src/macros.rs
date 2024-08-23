@@ -1,4 +1,11 @@
 #[macro_export]
+macro_rules! cxt {
+    ($cxt:expr) => {
+        const CXT: &'static str = $cxt;
+    };
+}
+
+#[macro_export]
 macro_rules! define_user_visible_error_type {
     ($name:ident, $msg:expr) => {
         #[derive(Debug)]

@@ -1,5 +1,5 @@
 [package]
-name = "fractic-generic-server-error"
+name = "fractic-server-error"
 version = "0.1.0"
 authors = ["Mart van Buren <mart@fractic.io>"]
 edition = "2021"

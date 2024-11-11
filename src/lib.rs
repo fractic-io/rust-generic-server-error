@@ -5,6 +5,7 @@ pub trait GenericServerErrorTrait:
     std::error::Error + std::fmt::Debug + std::fmt::Display + Send + Sync + 'static
 {
     fn should_be_shown_to_client(&self) -> bool;
+    fn debug(&self) -> Option<&String>;
     fn into_std_error(self: Box<Self>) -> Box<dyn std::error::Error + Send + Sync>;
 }
 
@@ -32,6 +33,9 @@ mod tests {
     impl GenericServerErrorTrait for TestErrorType {
         fn should_be_shown_to_client(&self) -> bool {
             true
+        }
+        fn debug(&self) -> Option<&String> {
+            None
         }
         fn into_std_error(self: Box<Self>) -> Box<dyn std::error::Error + Send + Sync> {
             self

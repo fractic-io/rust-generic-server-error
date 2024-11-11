@@ -53,6 +53,9 @@ macro_rules! define_user_visible_error_type {
             fn should_be_shown_to_client(&self) -> bool {
                 true
             }
+            fn debug(&self) -> Option<&String> {
+                self.debug.as_ref()
+            }
             fn into_std_error(self: Box<Self>) -> Box<dyn std::error::Error + Send + Sync> {
                 self
             }
@@ -125,6 +128,9 @@ macro_rules! define_user_visible_error_type_with_visible_info {
             fn should_be_shown_to_client(&self) -> bool {
                 true
             }
+            fn debug(&self) -> Option<&String> {
+                self.debug.as_ref()
+            }
             fn into_std_error(self: Box<Self>) -> Box<dyn std::error::Error + Send + Sync> {
                 self
             }
@@ -188,6 +194,9 @@ macro_rules! define_internal_error_type {
         impl GenericServerErrorTrait for $name {
             fn should_be_shown_to_client(&self) -> bool {
                 false
+            }
+            fn debug(&self) -> Option<&String> {
+                self.debug.as_ref()
             }
             fn into_std_error(self: Box<Self>) -> Box<dyn std::error::Error + Send + Sync> {
                 self

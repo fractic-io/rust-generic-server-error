@@ -4,4 +4,4 @@ use crate::define_internal_error;
 // --------------------------------------------------
 
 // For unexpected, unrecoverable errors:
-define_internal_error!(CriticalError, "CRITICAL");
+define_internal_error!(CriticalError, "CRITICAL; {details}", { details: String });

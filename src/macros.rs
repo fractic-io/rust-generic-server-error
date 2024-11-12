@@ -1,339 +1,276 @@
 #[macro_export]
-macro_rules! cxt {
-    ($cxt:expr) => {
-        const CXT: &'static str = $cxt;
-    };
-}
-
-#[macro_export]
-macro_rules! define_user_visible_error_type {
+macro_rules! define_internal_error {
     ($name:ident, $msg:expr) => {
+        define_internal_error!($name, $msg, {});
+    };
+    ($name:ident, $msg:expr, { $($arg:ident : $argtype:ty),* $(,)? }) => {
         #[derive(Debug)]
         pub struct $name {
-            pub context: &'static str,
-            pub message: &'static str,
-            pub debug: Option<String>,
+            #[allow(dead_code)]
+            context: String,
+            message: String,
+            debug: Option<String>,
         }
 
+        // Since internal errors usually indicate more serious issues, use
+        // expensive Backtrace::force_capture() to build context string, to
+        // facilitate manual debugging.
         impl $name {
-            pub fn default() -> GenericServerError {
+            #[allow(dead_code)]
+            pub fn new($($arg: $argtype),*) -> $crate::ServerError {
                 Box::new($name {
-                    context: "",
-                    message: "",
+                    context: std::backtrace::Backtrace::force_capture().to_string(),
+                    message: format!($msg, $($arg = $arg),*),
                     debug: None,
                 })
             }
-            pub fn new(context: &'static str, message: &'static str) -> GenericServerError {
+            #[allow(dead_code)]
+            pub fn with_debug<D>(
+                $($arg: $argtype,)*
+                debug: &D,
+            ) -> $crate::ServerError where D: std::fmt::Debug {
                 Box::new($name {
-                    context,
-                    message,
-                    debug: None,
-                })
-            }
-            pub fn with_debug(
-                context: &'static str,
-                message: &'static str,
-                debug: String,
-            ) -> GenericServerError {
-                Box::new($name {
-                    context,
-                    message,
-                    debug: Some(debug),
+                    context: std::backtrace::Backtrace::force_capture().to_string(),
+                    message: format!($msg, $($arg = $arg),*),
+                    debug: Some(format!("{:?}", debug)),
                 })
             }
         }
 
-        impl std::fmt::Display for $name {
-            fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-                write!(f, $msg)
+        impl $crate::ServerErrorTrait for $name {
+            fn behaviour(&self) -> $crate::ServerErrorBehaviour {
+                $crate::ServerErrorBehaviour::ReturnInternalServerError
             }
-        }
-
-        impl GenericServerErrorTrait for $name {
-            fn should_be_shown_to_client(&self) -> bool {
-                true
+            fn message(&self) -> &String {
+                &self.message
             }
             fn debug(&self) -> Option<&String> {
                 self.debug.as_ref()
-            }
-            fn into_std_error(self: Box<Self>) -> Box<dyn std::error::Error + Send + Sync> {
-                self
-            }
-        }
-
-        impl std::error::Error for $name {}
-
-        impl From<$name> for GenericServerError {
-            fn from(error: $name) -> Self {
-                Box::new(error)
             }
         }
     };
 }
 
 #[macro_export]
-macro_rules! define_user_visible_error_type_with_visible_info {
+macro_rules! define_client_error {
     ($name:ident, $msg:expr) => {
+        define_client_error!($name, $msg, {});
+    };
+    ($name:ident, $msg:expr, { $($arg:ident : $argtype:ty),* $(,)? }) => {
         #[derive(Debug)]
         pub struct $name {
-            pub context: &'static str,
-            pub message: &'static str,
-            pub user_visible_info: String,
-            pub debug: Option<String>,
+            #[allow(dead_code)]
+            context: String,
+            message: String,
+            debug: Option<String>,
         }
 
+        // This error type is usually less serious, and mainly indicates an
+        // issue with client code (not server code), so use cheaper
+        // Location::caller() instead of Backtrace::force_capture() to build
+        // context string.
         impl $name {
-            pub fn default() -> GenericServerError {
+            #[allow(dead_code)]
+            #[track_caller]
+            pub fn new($($arg: $argtype),*) -> $crate::ServerError {
+                let location = std::panic::Location::caller();
                 Box::new($name {
-                    context: "",
-                    message: "",
-                    user_visible_info: "".to_string(),
+                    context: format!("{}; {};", location.file(), location.line()),
+                    message: format!($msg, $($arg = $arg),*),
                     debug: None,
                 })
             }
-            pub fn new(
-                context: &'static str,
-                message: &'static str,
-                user_visible_info: String,
-            ) -> GenericServerError {
+            #[allow(dead_code)]
+            #[track_caller]
+            pub fn with_debug<D>(
+                $($arg: $argtype,)*
+                debug: &D,
+            ) -> $crate::ServerError where D: std::fmt::Debug {
+                let location = std::panic::Location::caller();
                 Box::new($name {
-                    context,
-                    message,
-                    user_visible_info,
-                    debug: None,
-                })
-            }
-            pub fn with_debug(
-                context: &'static str,
-                message: &'static str,
-                user_visible_info: String,
-                debug: String,
-            ) -> GenericServerError {
-                Box::new($name {
-                    context,
-                    message,
-                    user_visible_info,
-                    debug: Some(debug),
+                    context: format!("{}; {};", location.file(), location.line()),
+                    message: format!($msg, $($arg = $arg),*),
+                    debug: Some(format!("{:?}", debug)),
                 })
             }
         }
 
-        impl std::fmt::Display for $name {
-            fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-                write!(f, $msg, user_visible_info = self.user_visible_info)
+        impl $crate::ServerErrorTrait for $name {
+            fn behaviour(&self) -> $crate::ServerErrorBehaviour {
+                $crate::ServerErrorBehaviour::LogErrorSendFixedMsgToClient($crate::CLIENT_ERROR_MSG)
             }
-        }
-
-        impl GenericServerErrorTrait for $name {
-            fn should_be_shown_to_client(&self) -> bool {
-                true
+            fn message(&self) -> &String {
+                &self.message
             }
             fn debug(&self) -> Option<&String> {
                 self.debug.as_ref()
-            }
-            fn into_std_error(self: Box<Self>) -> Box<dyn std::error::Error + Send + Sync> {
-                self
-            }
-        }
-
-        impl std::error::Error for $name {}
-
-        impl From<$name> for GenericServerError {
-            fn from(error: $name) -> Self {
-                Box::new(error)
             }
         }
     };
 }
 
 #[macro_export]
-macro_rules! define_internal_error_type {
+macro_rules! define_sensitive_error {
     ($name:ident, $msg:expr) => {
+        define_sensitive_error!($name, $msg, {});
+    };
+    ($name:ident, $msg:expr, { $($arg:ident : $argtype:ty),* $(,)? }) => {
         #[derive(Debug)]
         pub struct $name {
-            pub context: &'static str,
-            pub message: &'static str,
-            pub debug: Option<String>,
+            #[allow(dead_code)]
+            context: String,
+            message: String,
+            debug: Option<String>,
         }
 
+        // To avoid leaking implementation details for sensitive errors, don't
+        // provide execution context.
         impl $name {
-            pub fn default() -> GenericServerError {
+            #[allow(dead_code)]
+            pub fn new($($arg: $argtype),*) -> $crate::ServerError {
                 Box::new($name {
-                    context: "",
-                    message: "",
+                    context: "OMITTED".to_string(),
+                    message: format!($msg, $($arg = $arg),*),
                     debug: None,
                 })
             }
-            pub fn new(context: &'static str, message: &'static str) -> GenericServerError {
+            #[allow(dead_code)]
+            pub fn with_debug<D>(
+                $($arg: $argtype,)*
+                debug: &D,
+            ) -> $crate::ServerError where D: std::fmt::Debug {
                 Box::new($name {
-                    context,
-                    message,
-                    debug: None,
-                })
-            }
-            pub fn with_debug(
-                context: &'static str,
-                message: &'static str,
-                debug: String,
-            ) -> GenericServerError {
-                Box::new($name {
-                    context,
-                    message,
-                    debug: Some(debug),
+                    context: "OMITTED".to_string(),
+                    message: format!($msg, $($arg = $arg),*),
+                    debug: Some(format!("{:?}", debug)),
                 })
             }
         }
 
-        impl std::fmt::Display for $name {
-            fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-                write!(f, $msg)?;
-                write!(f, " | {:?}", self)
+        impl $crate::ServerErrorTrait for $name {
+            fn behaviour(&self) -> $crate::ServerErrorBehaviour {
+                $crate::ServerErrorBehaviour::LogErrorSendFixedMsgToClient($crate::SENSITIVE_ERROR_MSG)
             }
-        }
-
-        impl GenericServerErrorTrait for $name {
-            fn should_be_shown_to_client(&self) -> bool {
-                false
+            fn message(&self) -> &String {
+                &self.message
             }
             fn debug(&self) -> Option<&String> {
                 self.debug.as_ref()
-            }
-            fn into_std_error(self: Box<Self>) -> Box<dyn std::error::Error + Send + Sync> {
-                self
-            }
-        }
-
-        impl std::error::Error for $name {}
-
-        impl From<$name> for GenericServerError {
-            fn from(error: $name) -> Self {
-                Box::new(error)
             }
         }
     };
 }
 
-// Tests.
-// --------------------------------------------------
+#[macro_export]
+macro_rules! define_user_error {
+    ($name:ident, $msg:expr) => {
+        define_user_error!($name, $msg, {});
+    };
+    ($name:ident, $msg:expr, { $($arg:ident : $argtype:ty),* $(,)? }) => {
+        #[derive(Debug)]
+        pub struct $name {
+            #[allow(dead_code)]
+            context: String,
+            message: String,
+            debug: Option<String>,
+        }
 
-#[cfg(test)]
-mod tests {
-    use crate::GenericServerError;
-    use crate::GenericServerErrorTrait;
+        // Since error type is usually not indicative of an error with the code,
+        // use cheaper Location::caller() instead of Backtrace::force_capture()
+        // to build context string.
+        impl $name {
+            #[allow(dead_code)]
+            #[track_caller]
+            pub fn new($($arg: $argtype),*) -> $crate::ServerError {
+                let location = std::panic::Location::caller();
+                Box::new($name {
+                    context: format!("{}; {};", location.file(), location.line()),
+                    message: format!($msg, $($arg = $arg),*),
+                    debug: None,
+                })
+            }
+            #[allow(dead_code)]
+            #[track_caller]
+            pub fn with_debug<D>(
+                $($arg: $argtype,)*
+                debug: &D,
+            ) -> $crate::ServerError where D: std::fmt::Debug {
+                let location = std::panic::Location::caller();
+                Box::new($name {
+                    context: format!("{}; {};", location.file(), location.line()),
+                    message: format!($msg, $($arg = $arg),*),
+                    debug: Some(format!("{:?}", debug)),
+                })
+            }
+        }
 
-    define_user_visible_error_type!(UserVisibleError, "User-visible error.");
-    define_user_visible_error_type_with_visible_info!(
-        UserVisibleErrorWithVisibleInfo,
-        "User-visible error: {user_visible_info}."
-    );
-    define_internal_error_type!(InternalError, "Internal error.");
+        impl $crate::ServerErrorTrait for $name {
+            fn behaviour(&self) -> $crate::ServerErrorBehaviour {
+                $crate::ServerErrorBehaviour::LogWarningForwardToClient
+            }
+            fn message(&self) -> &String {
+                &self.message
+            }
+            fn debug(&self) -> Option<&String> {
+                self.debug.as_ref()
+            }
+        }
+    };
+}
 
-    #[test]
-    fn test_user_visible_error() {
-        let basic: GenericServerError = UserVisibleError::default();
-        let normal: GenericServerError = UserVisibleError::new("cxt", "msg");
-        let with_debug: GenericServerError =
-            UserVisibleError::with_debug("cxt", "msg", "debug".to_string());
+#[macro_export]
+macro_rules! define_temporary_error {
+    ($name:ident, $msg:expr) => {
+        define_temporary_error!($name, $msg, {});
+    };
+    ($name:ident, $msg:expr, { $($arg:ident : $argtype:ty),* $(,)? }) => {
+        #[derive(Debug)]
+        pub struct $name {
+            #[allow(dead_code)]
+            context: String,
+            message: String,
+            debug: Option<String>,
+        }
 
-        // Basic (user-visible) printing:
-        assert_eq!(format!("{}", basic), "User-visible error.");
-        assert_eq!(format!("{}", normal), "User-visible error.");
-        assert_eq!(format!("{}", with_debug), "User-visible error.");
+        // Since error type is usually not indicative of an error with the code,
+        // use cheaper Location::caller() instead of Backtrace::force_capture()
+        // to build context string.
+        impl $name {
+            #[allow(dead_code)]
+            #[track_caller]
+            pub fn new($($arg: $argtype),*) -> $crate::ServerError {
+                let location = std::panic::Location::caller();
+                Box::new($name {
+                    context: format!("{}; {};", location.file(), location.line()),
+                    message: format!($msg, $($arg = $arg),*),
+                    debug: None,
+                })
+            }
+            #[allow(dead_code)]
+            #[track_caller]
+            pub fn with_debug<D>(
+                $($arg: $argtype,)*
+                debug: &D,
+            ) -> $crate::ServerError where D: std::fmt::Debug {
+                let location = std::panic::Location::caller();
+                Box::new($name {
+                    context: format!("{}; {};", location.file(), location.line()),
+                    message: format!($msg, $($arg = $arg),*),
+                    debug: Some(format!("{:?}", debug)),
+                })
+            }
+        }
 
-        // Debug printing:
-        assert_eq!(
-            format!("{:?}", basic),
-            "UserVisibleError { context: \"\", message: \"\", debug: None }"
-        );
-        assert_eq!(
-            format!("{:?}", normal),
-            "UserVisibleError { context: \"cxt\", message: \"msg\", debug: None }"
-        );
-        assert_eq!(
-            format!("{:?}", with_debug),
-            "UserVisibleError { context: \"cxt\", message: \"msg\", debug: Some(\"debug\") }"
-        );
-
-        assert!(basic.should_be_shown_to_client());
-        assert!(normal.should_be_shown_to_client());
-        assert!(with_debug.should_be_shown_to_client());
-
-        // Same result after converting into Box<std_error>.
-        assert_eq!(
-            format!("{:?}", with_debug.into_std_error()),
-            "UserVisibleError { context: \"cxt\", message: \"msg\", debug: Some(\"debug\") }"
-        );
-    }
-
-    #[test]
-    fn test_user_visible_error_with_visible_info() {
-        let basic = UserVisibleErrorWithVisibleInfo::default();
-        let normal = UserVisibleErrorWithVisibleInfo::new("cxt", "msg", "info".to_string());
-        let with_debug = UserVisibleErrorWithVisibleInfo::with_debug(
-            "cxt",
-            "msg",
-            "info".to_string(),
-            "debug".to_string(),
-        );
-
-        // Basic (user-visible) printing:
-        assert_eq!(format!("{}", basic), "User-visible error: .");
-        assert_eq!(format!("{}", normal), "User-visible error: info.");
-        assert_eq!(format!("{}", with_debug), "User-visible error: info.");
-
-        // Debug printing:
-        assert_eq!(
-            format!("{:?}", basic),
-            "UserVisibleErrorWithVisibleInfo { context: \"\", message: \"\", user_visible_info: \"\", debug: None }"
-        );
-        assert_eq!(
-            format!("{:?}", normal),
-            "UserVisibleErrorWithVisibleInfo { context: \"cxt\", message: \"msg\", user_visible_info: \"info\", debug: None }"
-        );
-        assert_eq!(
-            format!("{:?}", with_debug),
-            "UserVisibleErrorWithVisibleInfo { context: \"cxt\", message: \"msg\", user_visible_info: \"info\", debug: Some(\"debug\") }"
-        );
-
-        assert!(basic.should_be_shown_to_client());
-        assert!(normal.should_be_shown_to_client());
-        assert!(with_debug.should_be_shown_to_client());
-
-        // Same result after converting into Box<std_error>.
-        assert_eq!(
-            format!("{:?}", with_debug.into_std_error()),
-            "UserVisibleErrorWithVisibleInfo { context: \"cxt\", message: \"msg\", user_visible_info: \"info\", debug: Some(\"debug\") }"
-        );
-    }
-
-    #[test]
-    fn test_internal_error() {
-        let basic = InternalError::default();
-        let normal = InternalError::new("cxt", "msg");
-        let with_debug = InternalError::with_debug("cxt", "msg", "debug".to_string());
-
-        // Printing for internal use.
-        assert_eq!(
-            format!("{}", basic),
-            "Internal error. | InternalError { context: \"\", message: \"\", debug: None }"
-        );
-        assert_eq!(
-            format!("{}", normal),
-            "Internal error. | InternalError { context: \"cxt\", message: \"msg\", debug: None }"
-        );
-        assert_eq!(
-            format!("{}", with_debug),
-            "Internal error. | InternalError { context: \"cxt\", message: \"msg\", debug: Some(\"debug\") }"
-        );
-
-        assert!(!basic.should_be_shown_to_client());
-        assert!(!normal.should_be_shown_to_client());
-        assert!(!with_debug.should_be_shown_to_client());
-
-        // Same result after converting into Box<std_error>.
-        assert_eq!(
-            format!("{}", with_debug.into_std_error()),
-            "Internal error. | InternalError { context: \"cxt\", message: \"msg\", debug: Some(\"debug\") }"
-        );
-    }
+        impl $crate::ServerErrorTrait for $name {
+            fn behaviour(&self) -> $crate::ServerErrorBehaviour {
+                $crate::ServerErrorBehaviour::LogWarningForwardToClient
+            }
+            fn message(&self) -> &String {
+                &self.message
+            }
+            fn debug(&self) -> Option<&String> {
+                self.debug.as_ref()
+            }
+        }
+    };
 }

@@ -1,7 +1,8 @@
 [package]
 name = "fractic-server-error"
-version = "0.1.0"
+version = "0.2.0"
 authors = ["Mart van Buren <mart@fractic.io>"]
 edition = "2021"
 
 [dependencies]
+colored = "2.1.0"

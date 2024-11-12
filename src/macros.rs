@@ -52,6 +52,59 @@ macro_rules! define_internal_error {
 }
 
 #[macro_export]
+macro_rules! define_critical_error {
+    ($name:ident, $msg:expr) => {
+        define_critical_error!($name, $msg, {});
+    };
+    ($name:ident, $msg:expr, { $($arg:ident : $argtype:ty),* $(,)? }) => {
+        #[derive(Debug)]
+        pub struct $name {
+            #[allow(dead_code)]
+            context: String,
+            message: String,
+            debug: Option<String>,
+        }
+
+        // Since internal errors usually indicate more serious issues, use
+        // expensive Backtrace::force_capture() to build context string, to
+        // facilitate manual debugging.
+        impl $name {
+            #[allow(dead_code)]
+            pub fn new($($arg: $argtype),*) -> $crate::ServerError {
+                Box::new($name {
+                    context: std::backtrace::Backtrace::force_capture().to_string(),
+                    message: "CRITICAL; ".to_string() + &format!($msg, $($arg = $arg),*),
+                    debug: None,
+                })
+            }
+            #[allow(dead_code)]
+            pub fn with_debug<D>(
+                $($arg: $argtype,)*
+                debug: &D,
+            ) -> $crate::ServerError where D: std::fmt::Debug {
+                Box::new($name {
+                    context: std::backtrace::Backtrace::force_capture().to_string(),
+                    message: "CRITICAL; ".to_string() + &format!($msg, $($arg = $arg),*),
+                    debug: Some(format!("{:?}", debug)),
+                })
+            }
+        }
+
+        impl $crate::ServerErrorTrait for $name {
+            fn behaviour(&self) -> $crate::ServerErrorBehaviour {
+                $crate::ServerErrorBehaviour::ReturnInternalServerError
+            }
+            fn message(&self) -> &String {
+                &self.message
+            }
+            fn debug(&self) -> Option<&String> {
+                self.debug.as_ref()
+            }
+        }
+    };
+}
+
+#[macro_export]
 macro_rules! define_client_error {
     ($name:ident, $msg:expr) => {
         define_client_error!($name, $msg, {});

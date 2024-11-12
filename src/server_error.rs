@@ -32,8 +32,8 @@ impl std::error::Error for dyn ServerErrorTrait {}
 #[cfg(test)]
 mod tests {
     use crate::{
-        define_client_error, define_internal_error, define_sensitive_error, define_temporary_error,
-        define_user_error, CLIENT_ERROR_MSG, SENSITIVE_ERROR_MSG,
+        define_client_error, define_critical_error, define_internal_error, define_sensitive_error,
+        define_temporary_error, define_user_error, CLIENT_ERROR_MSG, SENSITIVE_ERROR_MSG,
     };
 
     use super::*;
@@ -49,6 +49,28 @@ mod tests {
         assert_eq!(
             format!("{}", error),
             format!("{}\n{:#?}", "An internal error occurred".bold(), error)
+        );
+        assert_eq!(
+            error.behaviour(),
+            ServerErrorBehaviour::ReturnInternalServerError
+        );
+    }
+
+    #[test]
+    fn test_critical_error() {
+        define_critical_error!(InternalError, "A critical error occurred");
+        let error = InternalError::with_debug(&"debug info".to_string());
+
+        assert_eq!(error.message(), "CRITICAL; A critical error occurred");
+        assert!(error.debug().is_some());
+        assert!(error.debug().unwrap().contains("debug info"));
+        assert_eq!(
+            format!("{}", error),
+            format!(
+                "{}\n{:#?}",
+                "CRITICAL; A critical error occurred".bold(),
+                error
+            )
         );
         assert_eq!(
             error.behaviour(),

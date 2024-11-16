@@ -29,6 +29,7 @@ pub enum ServerErrorContext {
 pub trait ServerErrorTrait: std::fmt::Debug + Send + Sync + 'static {
     fn behaviour(&self) -> ServerErrorBehaviour;
     fn tag(&self) -> ServerErrorTag;
+    fn context(&self) -> &String;
     fn message(&self) -> &String;
     fn debug(&self) -> Option<&String>;
 }

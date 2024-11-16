@@ -10,7 +10,6 @@ macro_rules! define_server_error {
     ) => {
         #[derive(Debug)]
         pub struct $name {
-            #[allow(dead_code)]
             context: String,
             message: String,
             debug: Option<String>,
@@ -67,6 +66,9 @@ macro_rules! define_server_error {
             }
             fn tag(&self) -> $crate::ServerErrorTag {
                 $tag
+            }
+            fn context(&self) -> &String {
+                &self.context
             }
             fn message(&self) -> &String {
                 &self.message

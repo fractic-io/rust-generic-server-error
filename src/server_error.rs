@@ -19,12 +19,31 @@ pub enum ServerErrorTag {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum ServerErrorContext {
-    Omit,
-    // Uses panic::Location::caller(), which is cheaper to compute.
-    Location,
-    // Uses backtrace::Backtrace::force_capture(), which is expensive to
-    // compute, but contains more information.
-    Backtrace,
+    /// Don't include any context information. Can be used for sensitive errors,
+    /// where we should be careful not to leak implementation details.
+    None,
+    /// Uses panic::Location::caller(), which is fairly cheap to compute.
+    Partial,
+    /// If RUST_BACKTRACE is set, uses backtrace::Backtrace::force_capture(),
+    /// which is expensive to compute but contains a lot of information.
+    /// Otherwise, same as Partial.
+    Full,
+}
+
+impl ServerErrorContext {
+    #[track_caller]
+    pub fn capture(&self) -> String {
+        match self {
+            ServerErrorContext::None => "OMITTED".to_string(),
+            ServerErrorContext::Full if std::env::var("RUST_BACKTRACE").is_ok() => {
+                std::backtrace::Backtrace::force_capture().to_string()
+            }
+            _ => {
+                let location = std::panic::Location::caller();
+                format!("{}; {};", location.file(), location.line())
+            }
+        }
+    }
 }
 
 pub trait ServerErrorTrait: std::fmt::Debug + Send + Sync + 'static {

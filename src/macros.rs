@@ -153,7 +153,7 @@ macro_rules! define_sensitive_error {
             // To avoid leaking implementation details for sensitive errors,
             // don't provide execution context.
             $crate::ServerErrorContext::Omit,
-            $crate::ServerErrorBehaviour::LogErrorSendFixedMsgToClient($crate::SENSITIVE_ERROR_MSG),
+            $crate::ServerErrorBehaviour::ReturnUnauthorized,
             $crate::ServerErrorTag::None
         );
     };

@@ -8,6 +8,7 @@ pub enum ServerErrorBehaviour {
     LogWarningSendFixedMsgToClient(&'static str),
     LogErrorSendFixedMsgToClient(&'static str),
     ReturnInternalServerError,
+    ReturnUnauthorized,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -57,7 +58,7 @@ impl std::error::Error for dyn ServerErrorTrait {}
 mod tests {
     use crate::{
         define_client_error, define_critical_error, define_internal_error, define_sensitive_error,
-        define_temporary_error, define_user_error, CLIENT_ERROR_MSG, SENSITIVE_ERROR_MSG,
+        define_temporary_error, define_user_error, CLIENT_ERROR_MSG,
     };
 
     use super::*;
@@ -139,10 +140,7 @@ mod tests {
         assert!(error_str.contains("Sensitive data error: leak detected for user user123."));
         assert!(error_str.contains("debug info"));
 
-        assert_eq!(
-            error.behaviour(),
-            ServerErrorBehaviour::LogErrorSendFixedMsgToClient(SENSITIVE_ERROR_MSG)
-        );
+        assert_eq!(error.behaviour(), ServerErrorBehaviour::ReturnUnauthorized);
         assert_eq!(error.tag(), ServerErrorTag::None);
     }
 

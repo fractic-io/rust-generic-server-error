@@ -61,7 +61,7 @@ impl std::fmt::Display for dyn ServerErrorTrait {
         match self.tag() {
             ServerErrorTag::None => {}
             ServerErrorTag::Critical => {
-                write!(f, "{}", "CRITICAL".bold().red())?;
+                write!(f, "{}", "CRITICAL; ".bold().red())?;
             }
         }
         write!(f, "{}\n{:#?}", self.message().bold(), self)
